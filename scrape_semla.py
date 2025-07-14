@@ -59,7 +59,6 @@ def scrape_individual_club(link, club_name):
             coords = iframeurl.split("q=")[1].split("&zoom=")[0] if "&zoom=" in iframeurl else None
             if coords:
                 lat, long = coords.split("%2C")
-                print(f"Coordinates for {club_name}: {lat}, {long}")
                 locationLat = float(lat) if lat else None
                 locationLong = float(long) if long else None
             else:
@@ -83,7 +82,6 @@ def scrape_individual_club(link, club_name):
         sourceName="SEMLA"
 
     )
-    print(club.__dict__)
     return club
 
 
@@ -105,7 +103,6 @@ def get_clubs_api_names():
                 # get the href and only the name after /clubs/
                 name = link.split("/clubs/")[1]
                 clubs.append(name)
-    print(f"Found {len(clubs)} clubs in SEMLA API.")
     return clubs
 
 

@@ -10,7 +10,6 @@ def scrape_sewla_events():
     soup = BeautifulSoup(response.text, "html.parser")
 
     events = []
-    print(f"Scraping events from {url}")
 
     # Find the ul inside a div with sqs-block-content (multiple divs may exist)
     content_divs = soup.find_all("div", class_="sqs-block-content")
