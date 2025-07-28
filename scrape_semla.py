@@ -2,6 +2,9 @@ import requests
 from bs4 import BeautifulSoup
 from classes import Club
 from classes import Game
+from classes import Event
+from classes import Location
+import hashlib
 
 def get_clubs():
     url = "https://www.southlacrosse.org.uk/clubs"
@@ -66,20 +69,29 @@ def scrape_individual_club(link, club_name):
                 locationLong = None
 
 
+    hash_input= f"{clubName}{link}"
+
+    hash_object_club = hashlib.sha256(hash_input.encode()).hexdigest()
 
     club = Club(
         clubName=clubName,
+        clubCode=club_name,
         logoUrl=logoUrl,
         website=website,
         facebook=facebook,
         twitter=twitter,
         instagram=instagram,
-        locationDescription=locationDescription,
-        locationAddress=locationAddress,
-        locationLat=locationLat,
-        locationLong=locationLong,
+        location=Location(
+            description=locationDescription,
+            address=locationAddress,
+            lat=locationLat,
+            long=locationLong
+        ), 
         sourceUrl=link,
-        sourceName="SEMLA"
+        sourceName="SEMLA", 
+        sport="Lacrosse",
+        hash=hash_object_club
+
 
     )
     return club
@@ -106,23 +118,48 @@ def get_clubs_api_names():
     return clubs
 
 
-def get_fixtures(club_name):
+def get_fixtures(club_name, semla_clubs_full):
     url = f"https://www.southlacrosse.org.uk/api/semla/v1/clubs/{club_name}/fixtures.json"
     response = requests.get(url)
     response.raise_for_status()
     fixtures = response.json()
+    # get location from semla_clubs_full for club_name
+    club = next((club for club in semla_clubs_full if club.name == club_name), None)
+    if club:
+        location = club.location
+    else:
+        location = None
+    # parse date and time
+
     # parse json into fixture class objects
     games = []
     for fixture in fixtures:
+        apiSourceUrl = f"https://www.southlacrosse.org.uk/clubs/{club_name}/fixtures",
+        hash_input= f"{fixture.get("home")}{fixture.get("away")}{apiSourceUrl}"
+
+        hash_object_game = hashlib.sha256(hash_input.encode()).hexdigest()
         game = Game(
-            homeTeamId=None,
             homeTeamName=fixture.get("home"),
-            awayTeamId=None,
             awayTeamName=fixture.get("away"),
             score = fixture.get("result"),
             competitionName=fixture.get("competition"),
-            competitionId=None,
-            location=None,
+            dateStart=process_datetime(fixture.get("matchDate"), fixture.get("matchTime")),
+            location= location,
+            sourceUrl=apiSourceUrl,
+            sourceName="SEMLA",
+            sport="Lacrosse",
+            hash=hash_object_game
         )
         games.append(game)
     return games
+
+def process_datetime(date, time):
+    # format is yyyy-mm-dd and hh:mm:ms
+    from datetime import datetime
+    if date and time:
+        datetime_str = f"{date} {time}"
+        try:
+            dt = datetime.strptime(datetime_str, "%Y-%m-%d %H:%M:%S")
+            return int(dt.timestamp())
+        except ValueError:
+            return None

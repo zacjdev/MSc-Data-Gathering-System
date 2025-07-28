@@ -1,6 +1,9 @@
 import requests
 from bs4 import BeautifulSoup
 from classes import Event
+from classes import Location
+from geo import get_lat_long
+import hashlib
 
 def scrape_sewla_events():
     url = "https://www.sewla.org/events"
@@ -41,13 +44,52 @@ def scrape_sewla_events():
             host = host.replace(" | Venue", "").strip()
         location = f"{venue} ({host})" if venue and host else venue or host
 
+        # get lat and long from the venue
+        lat, long = get_lat_long(venue) if venue else (None, None)
+
+        # Handle date ranges
+        start_date = None
+        end_date = None
+        # either in format "dd/mm/yyyy" or "dd and dd/mm/yyyy" convert to epoch
+        from datetime import datetime
+        if "TBC" in date_text_processed or "TBA" in date_text_processed:
+            start_date = None
+            end_date = None
+        elif " and " in date_text_processed or " - " in date_text_processed:
+            # split on " - " if it exists
+            date_text_processed = date_text_processed.replace(" - ", " and ")
+            # split on " and "
+            date_split = date_text_processed.split(" and ")
+            date_parts = date_split[1].split("/")
+            # for start date use the first part for day ONLY and the second part for month and year
+            start_date = datetime.strptime(f"{date_split[0]}/{date_parts[1]}/{date_parts[2]}", "%d/%m/%Y").timestamp()
+            end_date = datetime.strptime(f"{date_parts[0]}/{date_parts[1]}/{date_parts[2]}", "%d/%m/%Y").timestamp()
+     
+        else:
+            start_date = datetime.strptime(date_text_processed, "%d/%m/%Y").timestamp()
+            end_date = start_date
+
+        hash_input= f"{name}{url}"
+        hash_object = hashlib.sha256(hash_input.encode()).hexdigest()
+
         event = Event(
             name=name,
             dateText = date_text_processed,
-            location=location,
+            location=Location(
+                description=f"Host: {host}" if host else None,
+                address=venue,
+                lat=lat,
+                long=long,
+                generatedCoords=True
+
+            ),
             sourceUrl=url,
+            dateStart=date_text_processed,
             sourceName="SEWLA",
+            sport="Lacrosse",
+            hash=hash_object
         )
+
         events.append(event)
     
     return events

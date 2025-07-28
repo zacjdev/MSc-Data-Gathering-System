@@ -1,6 +1,9 @@
 import requests
 from bs4 import BeautifulSoup
 from classes import Event
+from classes import Location
+from geo import get_lat_long
+import hashlib
 
 def scrape_el():
     url = "https://www.englandlacrosse.co.uk/events-1"
@@ -86,17 +89,35 @@ def scrape_el():
         category = category_tag.find("a").get_text(strip=True) if category_tag else None
 
         sourceUrl = url
+
+        # get lat and long from the address
+        lat, long = get_lat_long(address) if address else (None, None)
+
+        hash_input= f"{name}{sourceUrl}"
+
+        hash_object = hashlib.sha256(hash_input.encode()).hexdigest()
+
+        print(hash_object)
+
         # Create Event instance
         event = Event(
             name=name,
             dateStart=dateStart,
             dateEnd=dateEnd,
-            location=location,
-            address=address,
+            location= Location(
+                address=address,
+                description=description,
+                lat=lat,
+                long=long,
+                generatedCoords=True
+
+            ),
             description=description,
             category=category,
             sourceUrl=sourceUrl,
             sourceName="England Lacrosse",
+            sport="Lacrosse",
+            hash =hash_object,
         )
 
         events.append(event)
