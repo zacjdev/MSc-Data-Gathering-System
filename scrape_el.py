@@ -93,11 +93,9 @@ def scrape_el():
         # get lat and long from the address
         lat, long = get_lat_long(address) if address else (None, None)
 
-        hash_input= f"{name}{sourceUrl}"
+        hash_input= f"{name}{sourceUrl}{dateStart}{dateEnd}"
 
         hash_object = hashlib.sha256(hash_input.encode()).hexdigest()
-
-        print(hash_object)
 
         # Create Event instance
         event = Event(

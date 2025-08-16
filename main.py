@@ -1,35 +1,32 @@
 import json
-# import functions
-from scrape_el import scrape_el
-from scrape_semla import get_clubs
-from scrape_semla import scrape_individual_club
-from scrape_semla import get_fixtures
-from scrape_semla import get_clubs_api_names
-from scrape_sewla import scrape_sewla_events
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
+from typing import Optional
+import uvicorn
+from apscheduler.schedulers.background import BackgroundScheduler
 import requests
+
+# Import your scraping logic
+from scrape_el import scrape_el
+from scrape_semla import get_clubs, scrape_individual_club, get_fixtures, get_clubs_api_names
+from scrape_sewla import scrape_sewla_events
 from classes import Event, Club, Game
-from geopy.geocoders import Nominatim
 
-# Control which scrapers to run
-modules = {
-    "el": True,  # England Lacrosse}
-    "semla": False, # SEMLA (South Mens)
-    "sewla": False, # SEWLA (South Womens)
-}
+# ---------- Scraper + Processing Logic ----------
 
-def scrape_data():
+def scrape_data(modules):
     el_events = []
-    if modules["el"]:
+    if modules.get("el"):
         el_events = scrape_el()
         print(f"Scraped {len(el_events)} events from England Lacrosse.")
 
     semla_clubs = []
-    if modules["semla"]:
+    if modules.get("semla"):
         semla_clubs = get_clubs()
     semla_clubs_full = []
     semla_fixtures_full = []
     club_fixtures = []
-    if modules["semla"] and semla_clubs:
+    if modules.get("semla") and semla_clubs:
         for club in semla_clubs:
             semla_clubs_full.append(scrape_individual_club(club['link'], club['name']))
 
@@ -39,8 +36,9 @@ def scrape_data():
             for club in club_fixtures:
                 for game in club:
                     semla_fixtures_full.append(game)
+
     sewla_events = []
-    if modules["sewla"]:
+    if modules.get("sewla"):
         sewla_events = scrape_sewla_events()
 
     print(f"Scraped {len(semla_clubs_full)} clubs from SEMLA.")
@@ -49,7 +47,6 @@ def scrape_data():
 
     events = el_events + sewla_events
     games = semla_fixtures_full
-
     clubs = semla_clubs_full
 
     return {
@@ -57,7 +54,6 @@ def scrape_data():
         "events": events,
         "clubs": clubs
     }
-import json
 
 def convert(obj_list):
     def serialize(obj):
@@ -75,8 +71,6 @@ def convert(obj_list):
             raise TypeError(f"Cannot serialize object of type {type(obj)}: {obj}")
 
     converted = [serialize(obj) for obj in obj_list]
-
-    # Remove duplicates using JSON serialization (handles nested dicts)
     seen = set()
     unique = []
     for item in converted:
@@ -96,30 +90,78 @@ def post_data(collection_name, data):
         print(f"Failed to save {collection_name}. Status code: {response.status_code}")
         print(response.text)
 
-        
-def main():
-    data = scrape_data()
-    ser_games = convert(data["games"])
-    print(f"Converted {len(ser_games)} games to serializable format.")
+def main(modules: dict):
+    # Clear all collections in Next.js via /api/admin/reset
+    reset_url = "http://localhost:3000/api/admin/reset"
+    reset_response = requests.post(reset_url)
+    
+    if reset_response.status_code == 200:
+        print("Successfully reset clubs, events, and games.")
+    else:
+        print("Failed to reset collections.")
+        print(reset_response.text)
+        return  # stop if reset failed to prevent inserting into stale data
 
+
+    data = scrape_data(modules)
+    ser_games = convert(data["games"])
     ser_events = convert(data["events"])
     ser_clubs = convert(data["clubs"])
 
-    if ser_events and len(ser_events) > 0:
+    if ser_events:
         post_data("events", ser_events)
     else:
         print("No events to post.")
-
-    if ser_games and len(ser_games) > 0:
+    if ser_games:
         post_data("games", ser_games)
     else:
         print("No games to post.")
-
-    if ser_clubs and len(ser_clubs) > 0:
+    if ser_clubs:
         post_data("clubs", ser_clubs)
     else:
         print("No clubs to post.")
 
+# ---------- FastAPI Setup ----------
 
-if __name__ == "__main__":
-    main()
+app = FastAPI()
+
+class ScrapeOptions(BaseModel):
+    el: Optional[bool] = True
+    semla: Optional[bool] = True
+    sewla: Optional[bool] = True
+
+@app.post("/run-scraper")
+async def run_scraper(options: ScrapeOptions):
+    modules = {
+        "el": options.el,
+        "semla": options.semla,
+        "sewla": options.sewla
+    }
+    main(modules)
+    return {"status": "Scraper run started", "options": modules}
+
+# ---------- Scheduler ----------
+
+scheduler = BackgroundScheduler()
+
+def scheduled_job():
+    print("Running scheduled scraper with all modules enabled.")
+    main({"el": True, "semla": True, "sewla": True})
+
+scheduler.add_job(scheduled_job, 'cron', hour=0, minute=0)  # every day at midnight
+scheduler.start()
+
+# ---------- Run with: uvicorn main:app --reload ----------
+import threading
+
+def manual_input_loop():
+    while True:
+        user_input = input("Type 'run' to manually trigger the scraper: ").strip().lower()
+        if user_input == 'run':
+            print("Manual trigger received. Running scraper with all modules enabled...")
+            main({"el": True, "semla": True, "sewla": True})
+        else:
+            print("Unknown command. Type 'run' to trigger the scraper.")
+
+input_thread = threading.Thread(target=manual_input_loop, daemon=True)
+input_thread.start()

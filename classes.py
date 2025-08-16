@@ -18,6 +18,7 @@ class Game:
             "awayTeamName": self.awayTeamName,
             "score": self.score,
             "competitionName": self.competitionName,
+            "dateStart": self.dateStart,
             "competitionId": self.competitionId,
             "location": self.location,
             "sourceUrl": self.sourceUrl,

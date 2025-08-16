@@ -145,7 +145,7 @@ def get_fixtures(club_name, semla_clubs_full):
             competitionName=fixture.get("competition"),
             dateStart=process_datetime(fixture.get("matchDate"), fixture.get("matchTime")),
             location= location,
-            sourceUrl=apiSourceUrl,
+            sourceUrl=apiSourceUrl[0],
             sourceName="SEMLA",
             sport="Lacrosse",
             hash=hash_object_game
