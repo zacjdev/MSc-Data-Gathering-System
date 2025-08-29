@@ -5,12 +5,19 @@ from typing import Optional
 import uvicorn
 from apscheduler.schedulers.background import BackgroundScheduler
 import requests
+# Import local environment vars
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+import os
+load_dotenv(dotenv_path=".env.local")
+API_LOCATION = os.getenv("API_LOCATION")
+API_KEY = os.getenv("API_KEY")
 
-# Import your scraping logic
 from scrape_el import scrape_el
 from scrape_semla import get_clubs, scrape_individual_club, get_fixtures, get_clubs_api_names
 from scrape_sewla import scrape_sewla_events
 from classes import Event, Club, Game
+
 
 # ---------- Scraper + Processing Logic ----------
 
@@ -82,7 +89,7 @@ def convert(obj_list):
     return unique
 
 def post_data(collection_name, data):
-    url = f"http://localhost:3000/api/{collection_name}"
+    url = f"http://{API_LOCATION}/api/{collection_name}?key={API_KEY}"
     response = requests.post(url, json=data)
     if response.status_code == 200:
         print(f"{collection_name} data saved successfully.")
@@ -92,7 +99,7 @@ def post_data(collection_name, data):
 
 def main(modules: dict):
     # Clear all collections in Next.js via /api/admin/reset
-    reset_url = "http://localhost:3000/api/admin/reset"
+    reset_url = f"http://{API_LOCATION}/api/admin/reset?key={API_KEY}"
     reset_response = requests.post(reset_url)
     
     if reset_response.status_code == 200:
@@ -125,6 +132,14 @@ def main(modules: dict):
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[f"http://{API_LOCATION}", "http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 class ScrapeOptions(BaseModel):
     el: Optional[bool] = True
     semla: Optional[bool] = True
@@ -149,7 +164,7 @@ def scheduled_job():
     main({"el": True, "semla": True, "sewla": True})
 
 scheduler.add_job(scheduled_job, 'cron', hour=0, minute=0)  # every day at midnight
-scheduler.start()
+scheduler.start() 
 
 # ---------- Run with: uvicorn main:app --reload ----------
 import threading
