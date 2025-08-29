@@ -6,6 +6,7 @@ from classes import Event
 from classes import Location
 import hashlib
 
+# ---------- SEMLA Clubs Scraper ----------
 def get_clubs():
     url = "https://www.southlacrosse.org.uk/clubs"
     response = requests.get(url)
@@ -16,14 +17,14 @@ def get_clubs():
     clubs = []
     # Find all club containers - td with class "cl-club"
     club_containers = soup.find_all("td", class_="cl-club")
-    # for each, extract the club name and link
+    # For each, extract the club name and link
     for container in club_containers:
         club_name_tag = container.find("a")
         if club_name_tag:
             link = club_name_tag.get("href")
             if link and not link.startswith("http"):
                 link = "https://www.southlacrosse.org.uk" + link
-            # link will be a span inside the a tag 
+            # Link will be a span inside the a tag 
             name = club_name_tag.get_text(strip=True)
             clubs.append({"name": name, "link": link})
     return clubs
@@ -47,18 +48,18 @@ def scrape_individual_club(link, club_name):
     twitter = next((link["href"] for link in social_links if "twitter.com" in link["href"]), None)
     instagram = next((link["href"] for link in social_links if "instagram.com" in link["href"]), None)
 
-    # get the location div
+    # Get the location div
     location_div = soup.find("div", class_="wp-block-semla-location")
     if location_div:
-        # first p text
+        # First p text
         locationAddress = location_div.find("p").get_text(strip=True) if location_div.find("p") else None
-        # all other p texts
+        # All other p texts
         locationDescription = " ".join(p.get_text(strip=True) for p in location_div.find_all("p")[1:]) if len(location_div.find_all("p")) > 1 else None
-        # get the hidden iframe for lat and long - get data-url attribute
+        # Get the hidden iframe for lat and long - get data-url attribute
         iframeurl = location_div.find("iframe")["data-url"] if location_div.find("iframe") else None
         if iframeurl:
-            # https://www.google.com/maps/embed/v1/place?q=51.599630%2C-0.224820&zoom=15&key=AIzaSyBa9auLpZff0JAO8ULWM-yJfi8gRcmN3GI
-            # remove everything before the q= and after the &key=
+            # Eg https://www.google.com/maps/embed/v1/place?q=51.599630%2C-0.224820&zoom=15&key=AIzaSyBa9auLpZff0JAO8ULWM-yJfi8gRcmN3GI
+            # Remove everything before the q= and after the &key=
             coords = iframeurl.split("q=")[1].split("&zoom=")[0] if "&zoom=" in iframeurl else None
             if coords:
                 lat, long = coords.split("%2C")
@@ -73,6 +74,7 @@ def scrape_individual_club(link, club_name):
 
     hash_object_club = hashlib.sha256(hash_input.encode()).hexdigest()
 
+    # Instantiate a Club object
     club = Club(
         clubName=clubName,
         clubCode=club_name,
@@ -91,47 +93,44 @@ def scrape_individual_club(link, club_name):
         sourceName="SEMLA", 
         sport="Lacrosse",
         hash=hash_object_club
-
-
     )
     return club
 
-
+# Get all club names from the SEMLA API - Used later only to get fixtures for each club
 def get_clubs_api_names():
     url = "https://www.southlacrosse.org.uk/api/semla/v1/clubs"
     response = requests.get(url)
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
     clubs = []
-    # get each tr and the first td, get the text 
+    # Get each tr and the first td
     club_rows = soup.find_all("tr")
     for row in club_rows:
         club_name_tag = row.find("td")
         if club_name_tag:
             club_name_link = club_name_tag.find("a")
             if club_name_link:
-                # get href
+                # Get href
                 link = club_name_link.get("href")
-                # get the href and only the name after /clubs/
+                # Extract the club name
                 name = link.split("/clubs/")[1]
                 clubs.append(name)
     return clubs
 
-
+# Get fixtures for a given club from the SEMLA API
 def get_fixtures(club_name, semla_clubs_full):
     url = f"https://www.southlacrosse.org.uk/api/semla/v1/clubs/{club_name}/fixtures.json"
     response = requests.get(url)
     response.raise_for_status()
     fixtures = response.json()
-    # get location from semla_clubs_full for club_name
+    # Get location from semla_clubs_full for club_name
     club = next((club for club in semla_clubs_full if club.name == club_name), None)
     if club:
         location = club.location
     else:
         location = None
-    # parse date and time
 
-    # parse json into fixture class objects
+    # Parse json into fixture class objects
     games = []
     for fixture in fixtures:
         apiSourceUrl = f"https://www.southlacrosse.org.uk/clubs/{club_name}/fixtures",
@@ -153,8 +152,9 @@ def get_fixtures(club_name, semla_clubs_full):
         games.append(game)
     return games
 
+# Helper function to process date and time into a timestamp
 def process_datetime(date, time):
-    # format is yyyy-mm-dd and hh:mm:ms
+    # Format is yyyy-mm-dd and hh:mm:ms
     from datetime import datetime
     if date and time:
         datetime_str = f"{date} {time}"

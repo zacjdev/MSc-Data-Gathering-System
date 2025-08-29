@@ -5,13 +5,12 @@ from classes import Location
 from geo import get_lat_long
 import hashlib
 
+# ---------- SEWLA Scraper ----------
 def scrape_sewla_events():
     url = "https://www.sewla.org/events"
     response = requests.get(url)
     response.raise_for_status()
-
     soup = BeautifulSoup(response.text, "html.parser")
-
     events = []
 
     # Find the ul inside a div with sqs-block-content (multiple divs may exist)
@@ -25,32 +24,32 @@ def scrape_sewla_events():
     event_items = event_list.find_all("li")
     events = []
     for item in event_items:
-        # get the name from the <strong:> tag
+        # Get the name from the <strong:> tag
         name = item.find("strong").get_text(strip=True) if item.find("strong") else None
 
-        # get the date from between "</strong: " and "<br>"
+        # Get the date from between "</strong: " and "<br>"
         date_text = item.get_text()
-        # split on ": "
+        # Split on ": "
         split_text = date_text.split(": ")
         date_text = split_text[1] if len(split_text) > 1 else date_text
-        # remove Host
+        # Remove Host
         date_text_processed = date_text.split("Host")[0].strip()
 
         venue = split_text[-1].strip() if len(split_text) > 1 else None
-        # remove  # remove  | Venue  from the venue if it exists
         
         host = split_text[-2].strip() if len(split_text) > 2 else None
         if host:
             host = host.replace(" | Venue", "").strip()
         location = f"{venue} ({host})" if venue and host else venue or host
 
-        # get lat and long from the venue
+        # Get lat and long from the venue
         lat, long = get_lat_long(venue) if venue else (None, None)
 
         # Handle date ranges
         start_date = None
         end_date = None
-        # either in format "dd/mm/yyyy" or "dd and dd/mm/yyyy" convert to epoch
+
+        # Either in format "dd/mm/yyyy" or "dd and dd/mm/yyyy" convert to epoch
         from datetime import datetime
         if "TBC" in date_text_processed or "TBA" in date_text_processed:
             start_date = None
@@ -72,6 +71,7 @@ def scrape_sewla_events():
         hash_input= f"{name}{url}"
         hash_object = hashlib.sha256(hash_input.encode()).hexdigest()
 
+        # Instantiate Event object
         event = Event(
             name=name,
             dateText = date_text_processed,
@@ -89,11 +89,6 @@ def scrape_sewla_events():
             sport="Lacrosse",
             hash=hash_object
         )
-
         events.append(event)
     
     return events
-
-
-        
-        

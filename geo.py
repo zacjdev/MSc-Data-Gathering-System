@@ -2,6 +2,7 @@ from geopy.geocoders import Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderUnavailable
 import time
 
+# Function to get latitude and longitude for a given place name - Uses Nominatim (OpenStreetMap) geocoding service with basic retry logic
 def get_lat_long(place_name, retries=3, delay=1):
     print(f"Getting lat/long for: {place_name} (Warning: Rate limited)")
 

@@ -5,6 +5,7 @@ from classes import Location
 from geo import get_lat_long
 import hashlib
 
+# ---------- England Lacrosse Scraper ----------
 def scrape_el():
     url = "https://www.englandlacrosse.co.uk/events-1"
     response = requests.get(url)
@@ -46,12 +47,12 @@ def scrape_el():
 
 
         else:
-            ### events on a single day
+            # All events on a single day
             start_date_timetag = date_tag.find("time") if date_tag else None
             start_date_date = start_date_timetag.get("datetime") if start_date_timetag else None
             end_date_date = start_date_date
             times_li = container.find("li", class_="eventlist-meta-time") if container else None
-            # get the time tags inside the times li
+            # Get the time tags inside the times li
             start_time_tag = times_li.find("time", class_="event-time-12hr-start") if times_li else None
             start_date_text = start_time_tag.get_text(strip=True) if start_time_tag else None
             end_time_tag = times_li.find("time", class_="event-time-12hr-end") if times_li else None
@@ -66,35 +67,32 @@ def scrape_el():
         # Location
         location_tag = container.find("li", class_="eventlist-meta-address")
 
-        # strip text from the li, then explopre the a tag and get the href
+        # Strip text from the li, then explopre the a tag and get the href. Extract the address from the href
         location = location_tag.get_text(strip=True) if location_tag else None
-        # remove (map) from the location text
+        # Remove (map) from the location text
         if location:
             location = location.replace("(map)", "").strip()
         if location_tag and location_tag.a:
             address = location_tag.a.get("href")
-            # remove the http://maps.google.com?q=
+            # Remove the http://maps.google.com?q=
             address = address.replace("http://maps.google.com?q=", "")
         else:
-            # if no address is found, set it to None
             address = None
 
-        # Description
+        # Event Description
         desc_tag = container.find("div", class_="eventlist-description")
         description = desc_tag.get_text(strip=True) if desc_tag else None
 
-        # Category
+        # Event Category
         category_tag = container.find("div", class_="eventlist-cats")
-        # go to a tag inside category div
         category = category_tag.find("a").get_text(strip=True) if category_tag else None
 
+        # Source URL
         sourceUrl = url
 
-        # get lat and long from the address
+        # Get lat and long from the address
         lat, long = get_lat_long(address) if address else (None, None)
-
         hash_input= f"{name}{sourceUrl}{dateStart}{dateEnd}"
-
         hash_object = hashlib.sha256(hash_input.encode()).hexdigest()
 
         # Create Event instance
