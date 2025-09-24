@@ -58,7 +58,6 @@ def scrape_individual_club(link, club_name):
         # Get the hidden iframe for lat and long - get data-url attribute
         iframeurl = location_div.find("iframe")["data-url"] if location_div.find("iframe") else None
         if iframeurl:
-            # Eg https://www.google.com/maps/embed/v1/place?q=51.599630%2C-0.224820&zoom=15&key=AIzaSyBa9auLpZff0JAO8ULWM-yJfi8gRcmN3GI
             # Remove everything before the q= and after the &key=
             coords = iframeurl.split("q=")[1].split("&zoom=")[0] if "&zoom=" in iframeurl else None
             if coords:
